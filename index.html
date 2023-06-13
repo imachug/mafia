@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title></title>
+
+		<style type="text/css">
+			body {
+				font-family: Arial, sans-serif;
+				font-size: 18px;
+				line-height: 20px;
+			}
+
+			th, td {
+				padding: 4px 0;
+				text-align: center;
+			}
+
+			.alive {
+				color: #0A0;
+			}
+			.dead {
+				color: #A00;
+			}
+			.banned {
+				color: #00F;
+			}
+
+			.mir {
+				color: #000;
+			}
+			.maf {
+				color: #A00;
+				font-weight: bold;
+			}
+			.don {
+				color: #F00;
+				font-weight: bold;
+				font-style: italic;
+			}
+			.com {
+				color: #00F;
+				font-weight: bold;
+				font-style: italic;
+			}
+
+			.falls0 {
+				color: #888;
+			}
+			.falls1 {
+				color: #444;
+			}
+			.falls2 {
+				color: #F88;
+			}
+			.falls3 {
+				color: #F00;
+			}
+			.falls4 {
+				color: #F00;
+				font-weight: bold;
+			}
+
+			td button {
+				display: block;
+				margin: 0 auto;
+			}
+
+			textarea {
+				margin-top: 32px;
+				width: calc(100% - 16px);
+				padding: 8px;
+				border: 1px solid #000;
+				height: 200px;
+				resize: none;
+			}
+		</style>
+	</head>
+	<body>
+		<button onclick="startGame()" id="startGame">Начать игру</button>
+
+		<div id="xchg" style="display: none">
+			Игрок <b>1</b> пересаживается на место <b id="xchg1"></b>.<br>
+			Игрок <b>2</b> пересаживается на место <b id="xchg2"></b>.<br>
+			Игрок <b>3</b> пересаживается на место <b id="xchg3"></b>.<br>
+			Игрок <b>4</b> пересаживается на место <b id="xchg4"></b>.<br>
+			Игрок <b>5</b> пересаживается на место <b id="xchg5"></b>.<br>
+			Игрок <b>6</b> пересаживается на место <b id="xchg6"></b>.<br>
+			Игрок <b>7</b> пересаживается на место <b id="xchg7"></b>.<br>
+			Игрок <b>8</b> пересаживается на место <b id="xchg8"></b>.<br>
+			Игрок <b>9</b> пересаживается на место <b id="xchg9"></b>.<br>
+			Игрок <b>10</b> пересаживается на место <b id="xchg10"></b>.<br>
+			<button onclick="shuffleRoles(false)">Распределить роли</button>
+			<button onclick="shuffleRoles(true)">Fake mode</button>
+		</div>
+
+		<div id="game" style="display: none">
+			<button onclick="nextDay()">Следующий кон</button>
+			<span>Кон: <span id="current_day">1</span></span>
+
+
+			<table style="width: 100%">
+				<tr id="rolesHeader"></tr>
+				<tr id="rolesDeath"></tr>
+				<tr id="rolesRole"></tr>
+				<tr id="rolesFalls"></tr>
+				<tr id="rolesKill"></tr>
+				<tr id="rolesVotes"></tr>
+			</table>
+
+			<div>
+				<h3>Таймер</h3>
+
+				<span id="timer">60.0</span> сек
+				<button onclick="startTimer()" id="timerStartPause">Старт</button>
+				<button onclick="resetTimer()">Reset</button>
+			</div>
+
+			<div>
+				<h3>Голосование</h3>
+
+				<div id="voteList"></div>
+				<button onclick="startVoting()">Начать голосование</button>
+			</div>
+
+			<textarea placeholder="Заметки"></textarea>
+		</div>
+
+		<div id="revote" style="display: none">
+			<h3>Переголосование</h3>
+			<div>Между <span id="revoteList"></span></div>
+
+			<div>Речь игрока <span id="revotePlayer"></span></div>
+			<span id="revoteTimer">30.0</span> сек
+			<button onclick="startRevote()" id="revoteStart">Старт</button>
+		</div>
+
+		<script type="text/javascript">
+			const ROLES_FAKE = ["mir", "mir", "mir", "mir", "mir", "mir", "mir", "mir", "mir", "com"];
+			const ROLES_REAL = ["mir", "mir", "mir", "mir", "mir", "mir", "maf", "maf", "don", "com"];
+			const COUNT = 10;
+
+			let is_fake_mode;
+
+			function $(q) {
+				return document.querySelector(q);
+			}
+			function hide(q) {
+				$(q).style.display = "none";
+			}
+			function show(q) {
+				$(q).style.display = "";
+			}
+
+
+			function shuffle(a) {
+				for(let i = a.length - 1; i > 0; i--) {
+					const j = Math.floor(Math.random() * (i + 1));
+					[a[i], a[j]] = [a[j], a[i]];
+				}
+				return a;
+			}
+
+
+			function startGame() {
+				hide("#startGame");
+				show("#xchg");
+
+				let chg = [];
+				for(let i = 1; i <= COUNT; i++) {
+					chg.push(i);
+				}
+				shuffle(chg);
+				for(let i = 1; i <= COUNT; i++) {
+					$(`#xchg${i}`).innerHTML = chg[i - 1];
+				}
+			}
+
+			let roles, alive, votes, falls, revoteList, revotePlayer, revoteTime, day;
+
+			function shuffleRoles(fake) {
+				hide("#xchg");
+				show("#game");
+
+				is_fake_mode = fake;
+				roles = fake ? ROLES_FAKE : ROLES_REAL;
+				shuffle(roles);
+
+				alive = Array(COUNT).fill(true);
+				votes = [];
+
+				falls = Array(COUNT).fill(0);
+
+				day = 1;
+
+				drawGame();
+				drawVotes();
+			}
+
+			function drawGame() {
+				$("#rolesHeader").innerHTML = "";
+				$("#rolesDeath").innerHTML = "";
+				$("#rolesRole").innerHTML = "";
+				$("#rolesFalls").innerHTML = "";
+				$("#rolesKill").innerHTML = "";
+				$("#rolesVotes").innerHTML = "";
+
+				for(let i = 1; i <= COUNT; i++) {
+					const isAlive = falls[i - 1] < 4 && alive[i - 1];
+
+					const th1 = document.createElement("th");
+					th1.innerHTML = `Игрок ${i}`;
+					$("#rolesHeader").appendChild(th1);
+
+					const td2 = document.createElement("td");
+					td2.innerHTML = falls[i - 1] == 4 ? "Вылетел" : (alive[i - 1] ? "Жив" : "Мертв");
+					td2.className = falls[i - 1] == 4 ? "banned" : (alive[i - 1] ? "alive" : "dead");
+					$("#rolesDeath").appendChild(td2);
+
+					const td3 = document.createElement("td");
+					td3.innerHTML = roles[i - 1];
+					td3.className = roles[i - 1];
+					$("#rolesRole").appendChild(td3);
+
+					const td4 = document.createElement("td");
+					td4.innerHTML = `<button onclick="minusFall(${i})">-</button>Фолы: ${falls[i - 1]}<button onclick="plusFall(${i})">+</button>`;
+					td4.className = `falls${falls[i - 1]}`;
+					$("#rolesFalls").appendChild(td4);
+
+					const td5 = document.createElement("td");
+					td5.innerHTML = isAlive ? `<button onclick="kill(${i})">Убить</button>` : "";
+					$("#rolesKill").appendChild(td5);
+
+					const td6 = document.createElement("td");
+					td6.innerHTML = isAlive ? (votes.indexOf(i) > -1 ? `<button onclick="unmarkForVote(${i})">Убрать</button>` : `<button onclick="markForVote(${i})">Выставить</button>`) : "";
+					$("#rolesVotes").appendChild(td6);
+				}
+			}
+
+			function drawVotes() {
+				if(votes.length === 0) {
+					$("#voteList").innerHTML = "Никто не выставлен";
+				} else if(votes.length === 1) {
+					$("#voteList").innerHTML = `Выставлен игрок ${votes[0]}`;
+				} else {
+					$("#voteList").innerHTML = `Выставлены игроки ${votes.join(", ")}`;
+				}
+			}
+
+			function nextDay() {
+				day++;
+				document.querySelector("#current_day").innerHTML = day;
+			}
+
+			function minusFall(i) {
+				if(falls[i - 1] > 0) {
+					falls[i - 1]--;
+					drawGame();
+				}
+			}
+			function plusFall(i) {
+				if(falls[i - 1] < 4) {
+					falls[i - 1]++;
+					drawGame();
+				}
+			}
+			function kill(i) {
+				alive[i - 1] = false;
+				let cntMir = 0;
+				let cntMaf = 0;
+				for(let i = 0; i < COUNT; i++) {
+					if(alive[i]) {
+						if(roles[i] === "mir" || roles[i] === "com") {
+							cntMir++;
+						} else {
+							cntMaf++;
+						}
+					}
+				}
+				drawGame();
+				if(!is_fake_mode) {
+					if(cntMaf === 0) {
+						alert("Мирные победили");
+					} else if(cntMaf >= cntMir) {
+						alert("Мафия победила");
+					}
+				}
+			}
+			function markForVote(i) {
+				votes.push(i);
+				drawGame();
+				drawVotes();
+			}
+			function unmarkForVote(i) {
+				votes.splice(votes.indexOf(i), 1);
+				drawGame();
+				drawVotes();
+			}
+
+			function startVoting() {
+				if(votes.length === 1 && day === 1) {
+					alert("Первый кон, никто не убит.");
+					votes = [];
+					drawGame();
+					drawVotes();
+					return;
+				}
+				let results = [];
+				for(let j = 0; j < votes.length - 1; j++) {
+					const i = votes[j];
+					results.push([i, parseInt(prompt(`Голосуем за игрока ${i}. Результат?`, "0"))]);
+				}
+				results.push([
+					votes.slice(-1)[0],
+					alive.reduce((a, b) => a + (b ? 1 : 0), 0) -
+					results.reduce((a, b) => a + b[1], 0)
+				]);
+				results.sort(((a, b) => b[1] - a[1]));
+				let cntSimilar = 0;
+				while(cntSimilar < results.length && results[cntSimilar][1] == results[0][1]) {
+					cntSimilar++;
+				}
+				if(cntSimilar > 1) {
+					revoteList = results.slice(0, cntSimilar).map(x => x[0]);
+					revotePlayer = revoteList[0];
+					hide("#game");
+					show("#revote");
+					revoteTime = 30;
+					drawRevote();
+				} else {
+					kill(results[0][0]);
+					alert(`На голосовании убит игрок ${results[0][0]}.`);
+				}
+				votes = [];
+				drawGame();
+				drawVotes();
+			}
+
+			function drawRevote() {
+				$("#revoteList").innerHTML = revoteList.join(", ");
+				$("#revotePlayer").innerHTML = revotePlayer;
+				$("#revoteTimer").innerHTML = revoteTime.toFixed(1);
+			}
+			function startRevote() {
+				revoteTime = 30;
+				drawRevote();
+				$("#revoteStart").innerHTML = "Стоп";
+				$("#revoteStart").onclick = stopRevote;
+				timerInterval = setInterval(revoteTick, 100);
+			}
+			function stopRevote() {
+				$("#revoteStart").innerHTML = "Старт";
+				$("#revoteStart").onclick = startRevote;
+				revoteTime = 0;
+				drawRevote();
+				wave(3);
+				clearInterval(timerInterval);
+				nextRevote();
+			}
+			function revoteTick() {
+				if(revoteTime <= 5.1 && revoteTime >= 5) {
+					wave(1);
+				}
+				if(revoteTime <= 0.1) {
+					stopRevote();
+					return;
+				}
+				revoteTime -= 0.1;
+				drawRevote();
+			}
+			function nextRevote() {
+				revotePlayer = revoteList[revoteList.indexOf(revotePlayer) + 1];
+				revoteTime = 30;
+
+				if(revotePlayer) {
+					drawRevote();
+				} else {
+					let results = [];
+					for(let j = 0; j < revoteList.length - 1; j++) {
+						const i = revoteList[j];
+						results.push([i, parseInt(prompt(`Голосуем за игрока ${i}. Результат?`, "0"))]);
+					}
+					results.push([
+						revoteList.slice(-1)[0],
+						alive.reduce((a, b) => a + (b ? 1 : 0), 0) -
+						results.reduce((a, b) => a + b[1], 0)
+					]);
+					results.sort(((a, b) => b[1] - a[1]));
+					let cntSimilar = 0;
+					while(cntSimilar < results.length && results[cntSimilar][1] == results[0][1]) {
+						cntSimilar++;
+					}
+					if(cntSimilar > 1) {
+						const killAll = parseInt(prompt("Голосуем за то, чтобы убить всех. Результат?"));
+						if(killAll >= alive.reduce((a, b) => a + (b ? 1 : 0), 0) / 2) {
+							alert(`Убиты игроки ${revoteList.join(", ")}`);
+							for(const player of revoteList) {
+								kill(player);
+							}
+						} else {
+							alert("Стол распилен");
+						}
+						hide("#revote");
+						show("#game");
+					} else {
+						kill(results[0][0]);
+						alert(`На голосовании убит игрок ${results[0][0]}.`);
+						hide("#revote");
+						show("#game");
+					}
+				}
+			}
+
+			let timerInterval = null, timerTime = 60;
+			function startTimer() {
+				clearInterval(timerInterval);
+				if(timerTime == 0) {
+					timerTime = 60;
+				}
+				drawTimer();
+				$("#timerStartPause").onclick = pauseTimer;
+				$("#timerStartPause").innerHTML = "Пауза";
+				timerInterval = setInterval(tick, 100);
+			}
+			function pauseTimer() {
+				$("#timerStartPause").onclick = startTimer;
+				$("#timerStartPause").innerHTML = "Старт";
+				clearInterval(timerInterval);
+			}
+			function resetTimer() {
+				timerTime = 60;
+				drawTimer();
+				startTimer();
+			}
+			function tick() {
+				if(timerTime <= 10.1 && timerTime >= 10) {
+					wave(1);
+				}
+				if(timerTime <= 0.1) {
+					timerTime = 0;
+					drawTimer();
+					wave(3);
+					pauseTimer();
+					return;
+				}
+				timerTime -= 0.1;
+				drawTimer();
+			}
+			function drawTimer() {
+				$("#timer").innerHTML = timerTime.toFixed(1);
+			}
+			function wave(i) {
+				const snd = new Audio("data:audio/wav;base64,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qJrx4KOQjahZxWbcZgztj2c49nKmkId44S71j0c8eV9yDK6uPRzx5X18eDvjvQ6yKo9ZSS6l//8elePK/Lf//IInrOF/FvDoADYAGBMGb7FtErm5MXMlmPAJQVgWta7Zx2go+8xJ0UiCb8LHHdftWyLJE0QIAIsI+UbXu67dZMjmgDGCGl1H+vpF4NSDckSIkk7Vd+sxEhBQMRU8j/12UIRhzSaUdQ+rQU5kGeFxm+hb1oh6pWWmv3uvmReDl0UnvtapVaIzo1jZbf/pD6ElLqSX+rUmOQNpJFa/r+sa4e/pBlAABoAAAAA3CUgShLdGIxsY7AUABPRrgCABdDuQ5GC7DqPQCgbbJUAoRSUj+NIEig0YfyWUho1VBBBA//uQZB4ABZx5zfMakeAAAAmwAAAAF5F3P0w9GtAAACfAAAAAwLhMDmAYWMgVEG1U0FIGCBgXBXAtfMH10000EEEEEECUBYln03TTTdNBDZopopYvrTTdNa325mImNg3TTPV9q3pmY0xoO6bv3r00y+IDGid/9aaaZTGMuj9mpu9Mpio1dXrr5HERTZSmqU36A3CumzN/9Robv/Xx4v9ijkSRSNLQhAWumap82WRSBUqXStV/YcS+XVLnSS+WLDroqArFkMEsAS+eWmrUzrO0oEmE40RlMZ5+ODIkAyKAGUwZ3mVKmcamcJnMW26MRPgUw6j+LkhyHGVGYjSUUKNpuJUQoOIAyDvEyG8S5yfK6dhZc0Tx1KI/gviKL6qvvFs1+bWtaz58uUNnryq6kt5RzOCkPWlVqVX2a/EEBUdU1KrXLf40GoiiFXK///qpoiDXrOgqDR38JB0bw7SoL+ZB9o1RCkQjQ2CBYZKd/+VJxZRRZlqSkKiws0WFxUyCwsKiMy7hUVFhIaCrNQsKkTIsLivwKKigsj8XYlwt/WKi2N4d//uQRCSAAjURNIHpMZBGYiaQPSYyAAABLAAAAAAAACWAAAAApUF/Mg+0aohSIRobBAsMlO//Kk4soosy1JSFRYWaLC4qZBYWFRGZdwqKiwkNBVmoWFSJkWFxX4FFRQWR+LsS4W/rFRb/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////VEFHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAU291bmRib3kuZGUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjAwNGh0dHA6Ly93d3cuc291bmRib3kuZGUAAAAAAAAAACU=");  
+				snd.play();
+				if(i > 1) {
+					snd.onended = () => wave(i - 1);
+				}
+			}
+		</script>
+	</body>
+</html>
